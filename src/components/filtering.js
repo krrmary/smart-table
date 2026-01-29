@@ -1,35 +1,57 @@
-import { createComparison, defaultRules } from "../lib/compare.js";
-
-// @todo: #4.3 — настроить компаратор
-const compare = createComparison(defaultRules);
-
-export function initFiltering(elements, indexes) {
-    // @todo: #4.1 — заполнить выпадающие списки опциями
+export function initFiltering(elements) {
+    const updateIndexes = (indexes) => {
     Object.keys(indexes).forEach((elementName) => {
-        const options = Object.values(indexes[elementName]).map(name => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            return option;
-        });
-        elements[elementName].append(...options);
-    });
+        const select = elements[elementName];
+        if (select && select.tagName === 'SELECT') {
+            select.innerHTML = '';
+            
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = 'Все';
+            select.appendChild(emptyOption);
 
-    return (data, state, action) => {
-        // @todo: #4.2 — обработать очистку поля
+            Object.values(indexes[elementName]).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            select.value = '';
+        }
+    });
+};
+
+    const applyFiltering = (query, state, action) => {
+        // Обработка очистки поля
         if (action?.name === 'clear') {
-            const field = action.dataset.field; // имя поля из data-field кнопки
-            const input = action.closest('[data-field]')?.querySelector('input, select');
-            if (input) {
-                input.value = ''; // сбрасываем значение в DOM
-                // Сбрасываем и в состоянии — хотя на самом деле state формируется заново из формы,
-                // но для единообразия и будущей гибкости можно явно это отразить.
-                // Однако в текущей архитектуре collectState() читает форму после сброса,
-                // поэтому достаточно сбросить input — state обновится автоматически.
+            const field = action.dataset.field;
+            const container = action.closest('[data-field]');
+            if (container) {
+                const input = container.querySelector('input, select');
+                if (input) {
+                    input.value = '';
+                }
             }
         }
 
-        // @todo: #4.5 — отфильтровать данные используя компаратор
-        return data.filter(row => compare(row, state));
+        // Формируем параметры фильтрации
+        const filter = {};
+        Object.keys(elements).forEach(key => {
+            const el = elements[key];
+            if (el && ['INPUT', 'SELECT'].includes(el.tagName) && el.value.trim()) {
+                // Используем name элемента как ключ фильтра
+                filter[`filter[${el.name}]`] = el.value;
+            }
+        });
+
+        return Object.keys(filter).length
+            ? Object.assign({}, query, filter)
+            : query;
+    };
+
+    return {
+        updateIndexes,
+        applyFiltering
     };
 }
